@@ -5,13 +5,10 @@ import { bucketQuiz } from "../Database/bucketQuiz.js";
 import responseHelper from "../Helper/responHelper.js";
 
 const redis = new Redis();
+let currentQuestionIndex = 0;
 const quizController = {
   randomQuiz: async (req, res) => {
     try {
-      const cacheData = await redis.get("verifyUser");
-      if (cacheData) {
-        return responseHelper(res, 200, cacheData, "Success");
-      }
       const verifyUser = await user.findOne({
         raw: true,
         where: {
@@ -19,7 +16,6 @@ const quizController = {
         },
       });
 
-      await redis.set("verifyUser", JSON.stringify(verifyUser));
       if (!verifyUser) {
         return responseHelper(res, 401, "", "Username not found");
       }
@@ -28,7 +24,25 @@ const quizController = {
 
       if (roundNumber >= 1 && roundNumber <= 10) {
         const quizz = bucketQuiz.round[`round-${roundNumber}`];
-        const soal = quizz.map((item) => quiz.soal[item - 1]);
+
+        const desiredIndex = currentQuestionIndex;
+
+        if (desiredIndex >= quizz.length) {
+          currentQuestionIndex = 0;
+          return res
+            .status(404)
+            .json({ message: "No more questions available." });
+        }
+
+        const desiredQuestion = quiz.soal[quizz[desiredIndex] - 1];
+        currentQuestionIndex++;
+
+        const soal = {
+          id: desiredQuestion.id,
+          type: desiredQuestion.type,
+          soal: desiredQuestion.soal,
+          answer: desiredQuestion.answer,
+        };
 
         return res.json(soal);
       } else {
