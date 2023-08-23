@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import db from "./Database/db.js";
 import userRouter from "./Route/userRoute.js";
+import quizRouter from "./Route/quizRoute.js";
 
 const port = process.env.PORT || 3000;
 const app = express();
@@ -22,6 +23,7 @@ db.sync()
   });
 
 app.use("/auth", userRouter);
+app.use("/quiz", quizRouter);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
