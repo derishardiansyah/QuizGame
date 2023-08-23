@@ -1,0 +1,19 @@
+import { DataTypes } from "sequelize";
+
+const userModels = (sequelize) =>
+  sequelize.define("Quiz", {
+    username: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    password: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    score: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+    },
+  });
+
+export default userModels;
