@@ -39,7 +39,7 @@ const quizController = {
 
           if (desiredIndex >= quizRound.length) {
             currentQuestionIndex = 0;
-            return responseHelper(res, 401, "", "Quiz finish");
+            return responseHelper(res, 200, "", "Quiz finish");
           }
 
           const desiredQuestion = quiz.soal[quizRound[desiredIndex] - 1];

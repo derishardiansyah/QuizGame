@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
-import { user } from "../Database/db.js";
+import db from "../Database/db.js";
+import userModels from "../Models/userModels.js";
 import responseHelper from "../Helper/responHelper.js";
 
 const redis = new Redis();
@@ -60,13 +61,16 @@ const answerController = {
         score = -5;
       }
 
-      const verifyUserFromDB = await user.findOne({
+      // Save score ke dalam database
+      const UserModel = userModels(db);
+      const saveScore = await UserModel.findOne({
         where: {
           username: user.username,
         },
       });
-      verifyUserFromDB.score = verifyUserFromDB.score + score;
-      await verifyUserFromDB.save();
+      saveScore.score = saveScore.score + score;
+      await saveScore.save();
+
       await redis.set(`answered:${user.username}:${user.idSoal}`, "true");
 
       res.json({
