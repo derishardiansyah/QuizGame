@@ -88,7 +88,7 @@ const userController = {
 
       await redis.setex("getUserQuiz", 300, JSON.stringify(usersScore));
       if (!users) {
-        return responseHelper(res, 401, "", "User not found", "error");
+        return responseHelper(res, 400, "", "User not found", "error");
       }
       return responseHelper(res, 200, usersScore, "success", "data");
     } catch (err) {
@@ -115,12 +115,12 @@ const userController = {
       });
 
       if (!users) {
-        return responseHelper(res, 401, "", "Invalid Username", "error");
+        return responseHelper(res, 400, "", "Invalid Username", "error");
       }
 
       const passwordIsValid = await bcrypt.compare(password, users.password);
       if (!passwordIsValid) {
-        return responseHelper(res, 401, "", "Invalid Password", "error");
+        return responseHelper(res, 400, "", "Invalid Password", "error");
       }
 
       const token = jwt.sign(

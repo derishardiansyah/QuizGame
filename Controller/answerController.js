@@ -10,9 +10,9 @@ const answerController = {
       const verifyUser = JSON.parse(await redis.get("verifyUser"));
       const displaySoal = JSON.parse(await redis.get("displaySoal"));
       const correctOption = JSON.parse(await redis.get("correctOption"));
+
       const user = {
         username: req.body.username,
-        idSoal: Number(req.body.idSoal),
         answer: req.body.answer,
       };
 
@@ -30,11 +30,7 @@ const answerController = {
       }
 
       if (user.username !== verifyUser.username) {
-        return responseHelper(res, 401, "", "User not found", "Error");
-      }
-
-      if (user.idSoal !== displaySoal.id) {
-        return responseHelper(res, 401, "", "idSoal not found", "Error");
+        return responseHelper(res, 400, "", "User not found", "Error");
       }
 
       let responseMessage = "";
@@ -44,7 +40,7 @@ const answerController = {
 
       if (user.answer === correctOption) {
         const startTime = parseInt(
-          await redis.get(`startTime:${user.username}:${user.idSoal}`)
+          await redis.get(`startTime:${user.username}:${displaySoal.id}`)
         );
         const timeTaken = (Date.now() - startTime) / 1000;
         if (timeTaken <= 10) score = 10;
@@ -71,15 +67,15 @@ const answerController = {
       saveScore.score = saveScore.score + score;
       await saveScore.save();
 
-      await redis.set(`answered:${user.username}:${user.idSoal}`, "true");
+      await redis.set(`answered:${user.username}:${displaySoal.id}`, "true");
 
       res.json({
-        username: user.username,
-        idSoal: user.idSoal,
+        idSoal: displaySoal.id,
         answer: user.answer,
         message: responseMessage,
         type: responseType,
         score: score,
+        correctAnswer: correctOption,
       });
     } catch (error) {
       responseHelper(res, 500, "", error, "Error");

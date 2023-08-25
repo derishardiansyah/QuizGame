@@ -30,8 +30,11 @@ const quizController = {
         const phoneNumberLastDigit = parseInt(
           verifyUserFromDB.phoneNumber.slice(-1)
         );
-        const roundNumber = phoneNumberLastDigit + 1;
 
+        const roundNumber =
+          JSON.parse(await redis.get("RoundNumber")) ||
+          phoneNumberLastDigit + 1;
+        console.log(roundNumber);
         if (roundNumber >= 1 && roundNumber <= 10) {
           const quizRound = bucketQuiz.round[`round-${roundNumber}`];
 
@@ -39,9 +42,9 @@ const quizController = {
 
           if (desiredIndex >= quizRound.length) {
             currentQuestionIndex = 0;
+            await redis.set("RoundNumber", JSON.parse(roundNumber) + 1);
             return responseHelper(res, 200, "", "Quiz finish");
           }
-
           const desiredQuestion = quiz.soal[quizRound[desiredIndex] - 1];
           currentQuestionIndex++;
 
@@ -54,11 +57,12 @@ const quizController = {
 
           // setting waktu default pada saat klik
           const startTime = Date.now();
+
           await redis.set(
             `startTime:${verifyUserFromDB.username}:${displaySoal.id}`,
             startTime
           );
-
+          await redis.set("RoundNumber", JSON.stringify(roundNumber));
           await redis.set("verifyUser", JSON.stringify(verifyUserFromDB));
           await redis.set("displaySoal", JSON.stringify(displaySoal));
           await redis.set(
@@ -67,7 +71,7 @@ const quizController = {
           );
           return res.json(displaySoal);
         } else {
-          return responseHelper(res, 401, "", "Round not found");
+          return responseHelper(res, 400, "", "Round not found");
         }
       }
     } catch (error) {
