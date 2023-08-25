@@ -23,15 +23,6 @@ const userController = {
         phoneNumber: req.body.phoneNumber,
       };
 
-      const token = jwt.sign(
-        {
-          username: data.username,
-        },
-        process.env.secretLogin,
-        {
-          expiresIn: "1d",
-        }
-      );
       const newUser = await user.create(data);
       const displayUser = {
         id: newUser.id,
@@ -44,7 +35,6 @@ const userController = {
         200,
         {
           displayUser,
-          token: token,
         },
         "User has been created",
         "success"
@@ -54,37 +44,6 @@ const userController = {
     }
   },
   getUser: async (req, res) => {
-    try {
-      const chachedUser = await redis.get("getUserQuiz");
-      if (chachedUser) {
-        return responseHelper(
-          res,
-          200,
-          { data: JSON.parse(chachedUser) },
-          "User data",
-          "success"
-        );
-      }
-      let token = req.headers.authorization.split(" ")[1];
-
-      const users = await user.findAll();
-
-      const usersScore = users.map((users) => ({
-        username: users.username,
-        score: users.score,
-      }));
-
-      await redis.setex("getUserQuiz", 300, JSON.stringify(usersScore));
-      if (!users) {
-        return responseHelper(res, 401, "", "User not found", "error");
-      }
-      return responseHelper(res, 200, usersScore, "success", "data");
-    } catch (err) {
-      console.log(err);
-      responseHelper(res, 500, "", err, "error");
-    }
-  },
-  loginUser: async (req, res) => {
     try {
       const token = req.headers.authorization.split(" ")[1];
       if (!token) {
@@ -109,6 +68,35 @@ const userController = {
       if (tokenExpired) {
         return responseHelper(res, 401, "", "Token has expired", "error");
       }
+      const chachedUser = await redis.get("getUserQuiz");
+      if (chachedUser) {
+        return responseHelper(
+          res,
+          200,
+          { data: JSON.parse(chachedUser) },
+          "User data",
+          "success"
+        );
+      }
+
+      const users = await user.findAll();
+
+      const usersScore = users.map((users) => ({
+        username: users.username,
+        score: users.score,
+      }));
+
+      await redis.setex("getUserQuiz", 300, JSON.stringify(usersScore));
+      if (!users) {
+        return responseHelper(res, 401, "", "User not found", "error");
+      }
+      return responseHelper(res, 200, usersScore, "success", "data");
+    } catch (err) {
+      responseHelper(res, 500, "", err, "error");
+    }
+  },
+  loginUser: async (req, res) => {
+    try {
       const { username, password } = req.body;
 
       if (!username || !password) {
@@ -134,20 +122,23 @@ const userController = {
       if (!passwordIsValid) {
         return responseHelper(res, 401, "", "Invalid Password", "error");
       }
-      if (!decode.username) {
-        return responseHelper(
-          res,
-          401,
-          "",
-          "Unauthorized access to this profile"
-        );
-      }
+
+      const token = jwt.sign(
+        {
+          username: user.username,
+        },
+        process.env.secretLogin,
+        {
+          expiresIn: "1d",
+        }
+      );
       return responseHelper(
         res,
         200,
         {
           id: users.id,
           username: username,
+          token: token,
         },
         "Login successful"
       );
@@ -159,17 +150,29 @@ const userController = {
   getProfile: async (req, res) => {
     try {
       const token = req.headers.authorization.split(" ")[1];
-      const decode = jwt.verify(token, process.env.secretLogin);
-
-      const requestedUsername = req.params.username;
-      if (decode.username !== requestedUsername) {
-        return responseHelper(
-          res,
-          401,
-          "",
-          "Unauthorized access to this profile"
-        );
+      if (!token) {
+        return responseHelper(res, 401, "", "Token missing");
       }
+
+      let decode;
+      let tokenExpired = false;
+
+      jwt.verify(token, process.env.secretLogin, (error, decoded) => {
+        if (error) {
+          if (error.name === "TokenExpiredError") {
+            tokenExpired = true;
+          } else {
+            return responseHelper(res, 401, "", "Invalid token", "error");
+          }
+        } else {
+          decode = decoded;
+        }
+      });
+
+      if (tokenExpired) {
+        return responseHelper(res, 401, "", "Token has expired", "error");
+      }
+
       const users = await user.findOne({
         where: {
           username: req.params.username,

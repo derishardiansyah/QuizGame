@@ -22,7 +22,7 @@ const answerController = {
       if (hasAnswered) {
         return responseHelper(
           res,
-          401,
+          400,
           "",
           "You have already answered this quiz",
           "Error"

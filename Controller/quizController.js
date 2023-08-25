@@ -24,7 +24,7 @@ const quizController = {
           },
         });
         if (!verifyUserFromDB) {
-          return responseHelper(res, 401, "", "Username not found");
+          return responseHelper(res, 400, "", "Username not found");
         }
 
         const phoneNumberLastDigit = parseInt(
