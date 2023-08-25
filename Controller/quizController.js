@@ -1,4 +1,4 @@
-import { Redis } from "ioredis";
+import Redis from "ioredis";
 import { user } from "../Database/db.js";
 import { quiz } from "../Database/quiz.js";
 import { bucketQuiz } from "../Database/bucketQuiz.js";
@@ -6,50 +6,72 @@ import responseHelper from "../Helper/responHelper.js";
 
 const redis = new Redis();
 let currentQuestionIndex = 0;
+let newUsername = null;
+
 const quizController = {
   randomQuiz: async (req, res) => {
     try {
-      const verifyUser = await user.findOne({
-        raw: true,
-        where: {
-          username: req.body.username,
-        },
-      });
-
-      if (!verifyUser) {
-        return responseHelper(res, 401, "", "Username not found");
+      const storedVerifyUserData = JSON.parse(await redis.get("verifyUser"));
+      if (storedVerifyUserData.username !== newUsername) {
+        currentQuestionIndex = 0;
+        newUsername = storedVerifyUserData.username;
       }
-      const phoneNumberLastDigit = parseInt(verifyUser.phoneNumber.slice(-1));
-      const roundNumber = phoneNumberLastDigit + 1;
-
-      if (roundNumber >= 1 && roundNumber <= 10) {
-        const quizz = bucketQuiz.round[`round-${roundNumber}`];
-
-        const desiredIndex = currentQuestionIndex;
-
-        if (desiredIndex >= quizz.length) {
-          currentQuestionIndex = 0;
-          return res
-            .status(404)
-            .json({ message: "No more questions available." });
+      if (storedVerifyUserData) {
+        const verifyUserFromDB = await user.findOne({
+          raw: true,
+          where: {
+            username: req.body.username,
+          },
+        });
+        if (!verifyUserFromDB) {
+          return responseHelper(res, 401, "", "Username not found");
         }
 
-        const desiredQuestion = quiz.soal[quizz[desiredIndex] - 1];
-        currentQuestionIndex++;
+        const phoneNumberLastDigit = parseInt(
+          verifyUserFromDB.phoneNumber.slice(-1)
+        );
+        const roundNumber = phoneNumberLastDigit + 1;
 
-        const soal = {
-          id: desiredQuestion.id,
-          type: desiredQuestion.type,
-          soal: desiredQuestion.soal,
-          answer: desiredQuestion.answer,
-        };
+        if (roundNumber >= 1 && roundNumber <= 10) {
+          const quizRound = bucketQuiz.round[`round-${roundNumber}`];
 
-        return res.json(soal);
-      } else {
-        return responseHelper(res, 401, "", "Round not found");
+          const desiredIndex = currentQuestionIndex;
+
+          if (desiredIndex >= quizRound.length) {
+            currentQuestionIndex = 0;
+            return responseHelper(res, 401, "", "Quiz finish");
+          }
+
+          const desiredQuestion = quiz.soal[quizRound[desiredIndex] - 1];
+          currentQuestionIndex++;
+
+          const displaySoal = {
+            id: desiredQuestion.id,
+            type: desiredQuestion.type,
+            soal: desiredQuestion.soal,
+            answer: desiredQuestion.answer,
+          };
+
+          // setting waktu default pada saat klik
+          const startTime = Date.now();
+          await redis.set(
+            `startTime:${verifyUserFromDB.username}:${displaySoal.id}`,
+            startTime
+          );
+
+          await redis.set("verifyUser", JSON.stringify(verifyUserFromDB));
+          await redis.set("displaySoal", JSON.stringify(displaySoal));
+          await redis.set(
+            "correctOption",
+            JSON.stringify(desiredQuestion.correctOption)
+          );
+          return res.json(displaySoal);
+        } else {
+          return responseHelper(res, 401, "", "Round not found");
+        }
       }
     } catch (error) {
-      responseHelper(res, 500, "", error, "error");
+      return responseHelper(res, 500, "", error, "error");
     }
   },
 };

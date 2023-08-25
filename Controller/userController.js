@@ -29,7 +29,7 @@ const userController = {
         },
         process.env.secretLogin,
         {
-          expiresIn: "1h",
+          expiresIn: "1d",
         }
       );
       const newUser = await user.create(data);
@@ -90,8 +90,25 @@ const userController = {
       if (!token) {
         return responseHelper(res, 401, "", "Token missing");
       }
-      const decode = jwt.verify(token, process.env.secretLogin);
 
+      let decode;
+      let tokenExpired = false;
+
+      jwt.verify(token, process.env.secretLogin, (error, decoded) => {
+        if (error) {
+          if (error.name === "TokenExpiredError") {
+            tokenExpired = true;
+          } else {
+            return responseHelper(res, 401, "", "Invalid token", "error");
+          }
+        } else {
+          decode = decoded;
+        }
+      });
+
+      if (tokenExpired) {
+        return responseHelper(res, 401, "", "Token has expired", "error");
+      }
       const { username, password } = req.body;
 
       if (!username || !password) {
